@@ -1,0 +1,96 @@
+---
+title: "Course 8 - Practical Machine Learning - Prediction Assignment - FINAL VERSION"
+author: "Pedro Magalhaes Batista"
+date: "12/10/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction
+We aim at predicting how our subjects exercise. In this report we describe how we built our model and how we used cross validation.
+
+## 2. Data
+
+```{r, echo=FALSE}
+library(rpart.plot)
+library(rpart)
+library(RColorBrewer)
+library(randomForest)
+library(gbm)
+library(plyr)
+library(caret)
+library(knitr)
+library(caret)
+library(rattle)
+library(corrplot)
+```
+
+```{r, echo=FALSE}
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "./pml-training.csv")
+dtraining <- read.csv("./pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+download.file(url = "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "./pml-testing.csv")
+dtesting <- read.csv("./pml-testing.csv", na.strings=c("NA","#DIV/0!",""))
+```
+
+We partition the data into training (60%) and testing (40%).
+
+```{r, echo=FALSE}
+valid <- names(dtesting[,colSums(is.na(dtesting)) == 0])[8:59]
+dtraining <- dtraining[,c(valid,"classe")]
+dtesting <- dtesting[,c(valid,"problem_id")]
+dim(dtraining); dim(dtesting);
+```
+
+```{r}
+set.seed(12345)
+Train <- createDataPartition(dtraining$classe, p=0.55, list=FALSE)
+training <- dtraining[Train,]
+testing <- dtraining[-Train,]
+dim(training); dim(testing);
+```
+
+## 3. Prediction Model
+Now we build a (i) Decison Tree and (ii) Random Forest Model.
+Decision Tree
+```{r}
+set.seed(301)
+modFitDecTree <- rpart(classe ~ ., data=training, method="class")
+fancyRpartPlot(modFitDecTree)
+```
+```{r, echo=FALSE}
+predictTree <- predict(modFitDecTree, newdata=testing, type="class")
+confTree <- confusionMatrix(predictTree, testing$classe)
+confTree
+
+plot(confTree$table, col = confTree$byClass, 
+     main = paste("Decision Tree - Accuracy =",
+                  round(confTree$overall['Accuracy'], 4)))
+```
+
+Random Forest Model
+```{r}
+set.seed(12345)
+
+modFitRF <- randomForest(classe ~ ., data = training, method = "rf", importance = T, trControl = trainControl(method = "cv", classProbs=TRUE,savePredictions=TRUE,allowParallel=TRUE, number = 10))
+
+plot(modFitRF)
+```
+
+```{r}
+prediction <- predict(modFitRF, testing, type = "class")
+confusionMatrix(prediction, testing$classe)
+```
+
+Random forest model obtains 99.3% Accuracy.
+
+## 4. Choosing Model
+
+We apply random forest model that produces 99.3% accuracy over decision tree:
+```{r}
+predictTEST <- predict(modFitRF, newdata=testing)
+predictTEST
+```
+
